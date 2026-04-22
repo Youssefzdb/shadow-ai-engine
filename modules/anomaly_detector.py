@@ -1,44 +1,54 @@
 #!/usr/bin/env python3
-"""Anomaly Detector using statistical analysis"""
-import statistics
-from collections import Counter
+"""Anomaly Detector - Statistical + ML-based detection"""
+
+try:
+    import numpy as np
+    from sklearn.ensemble import IsolationForest
+    HAS_ML = True
+except ImportError:
+    HAS_ML = False
 
 class AnomalyDetector:
-    def __init__(self, profile):
-        self.profile = profile
-        self.threshold = 2.5  # standard deviations
-
-    def train(self):
-        """Build baseline from profile data"""
-        self.baseline = {
-            "mean_requests": statistics.mean(self.profile.get("request_counts", [1])),
-            "stdev_requests": statistics.stdev(self.profile.get("request_counts", [1, 1])) if len(self.profile.get("request_counts", [])) > 1 else 1,
-        }
-        print(f"[+] Baseline trained: mean={self.baseline['mean_requests']:.2f}")
+    def __init__(self, features, threshold=0.8):
+        self.features = features
+        self.threshold = threshold
 
     def detect(self):
+        if not self.features:
+            return []
+
         anomalies = []
-        ip_counts = self.profile.get("ip_counts", {})
-        
-        if not ip_counts:
-            return anomalies
 
-        counts = list(ip_counts.values())
-        if len(counts) < 2:
-            return anomalies
+        if HAS_ML:
+            import numpy as np
+            X = np.array([[
+                f["total_requests"],
+                f["error_rate"],
+                f["path_diversity"],
+                f["unique_paths"]
+            ] for f in self.features])
 
-        mean = statistics.mean(counts)
-        stdev = statistics.stdev(counts)
+            clf = IsolationForest(contamination=0.1, random_state=42)
+            preds = clf.fit_predict(X)
+            scores = clf.decision_function(X)
 
-        for ip, count in ip_counts.items():
-            z_score = (count - mean) / stdev if stdev > 0 else 0
-            if z_score > self.threshold:
-                anomalies.append({
-                    "ip": ip,
-                    "count": count,
-                    "z_score": round(z_score, 2),
-                    "type": "Statistical Anomaly"
-                })
-                print(f"[!] Anomaly detected: {ip} z-score={z_score:.2f}")
+            for i, (pred, score) in enumerate(zip(preds, scores)):
+                if pred == -1:
+                    f = dict(self.features[i])
+                    f["anomaly_score"] = round(abs(score), 3)
+                    anomalies.append(f)
+                    print(f"[!] Anomaly: {f['ip']} (score={f['anomaly_score']})")
+        else:
+            # Fallback: statistical rules
+            for f in self.features:
+                score = 0
+                if f["error_rate"] > 0.5: score += 0.4
+                if f["total_requests"] > 1000: score += 0.3
+                if f["path_diversity"] > 0.8: score += 0.3
+                if score >= self.threshold:
+                    f2 = dict(f)
+                    f2["anomaly_score"] = round(score, 3)
+                    anomalies.append(f2)
+                    print(f"[!] Anomaly: {f2['ip']} (score={score})")
 
         return anomalies
