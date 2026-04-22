@@ -1,36 +1,39 @@
 #!/usr/bin/env python3
 """
 shadow-ai-engine - AI-Powered Threat Detection & Anomaly Analysis Engine
-Uses ML to detect anomalies in network traffic and log data
+Uses ML to detect anomalies in network traffic, logs, and system behavior
 """
 import argparse
 from modules.anomaly_detector import AnomalyDetector
 from modules.behavior_analyzer import BehaviorAnalyzer
-from modules.alert_engine import AlertEngine
+from modules.threat_classifier import ThreatClassifier
 from modules.report import AIReport
 
 def main():
-    parser = argparse.ArgumentParser(description="ShadowAI Threat Detection Engine")
-    parser.add_argument("--logs", required=True, help="Path to log file or directory")
-    parser.add_argument("--threshold", type=float, default=0.85, help="Anomaly threshold (0-1)")
+    parser = argparse.ArgumentParser(description="Shadow AI Engine - Threat Detection")
+    parser.add_argument("input", help="CSV log file or directory")
+    parser.add_argument("--mode", choices=["anomaly", "behavior", "classify", "full"], default="full")
     parser.add_argument("--output", default="ai_threat_report.html")
     args = parser.parse_args()
 
-    print(f"[*] ShadowAI Engine starting...")
-    print(f"[*] Analyzing: {args.logs} | Threshold: {args.threshold}")
+    print(f"[*] Shadow AI Engine starting on: {args.input}")
+    results = {}
 
-    detector = AnomalyDetector(args.logs, args.threshold)
-    anomalies = detector.detect()
+    if args.mode in ["anomaly", "full"]:
+        detector = AnomalyDetector(args.input)
+        results["anomalies"] = detector.detect()
 
-    behavior = BehaviorAnalyzer(args.logs)
-    behaviors = behavior.analyze()
+    if args.mode in ["behavior", "full"]:
+        analyzer = BehaviorAnalyzer(args.input)
+        results["behaviors"] = analyzer.analyze()
 
-    alerts = AlertEngine(anomalies, behaviors)
-    triggered = alerts.evaluate()
+    if args.mode in ["classify", "full"]:
+        classifier = ThreatClassifier(results.get("anomalies", []))
+        results["threats"] = classifier.classify()
 
-    report = AIReport(anomalies, behaviors, triggered)
+    report = AIReport(args.input, results)
     report.save(args.output)
-    print(f"[+] Detected {len(anomalies)} anomalies, {len(triggered)} alerts. Report: {args.output}")
+    print(f"[+] Report saved: {args.output}")
 
 if __name__ == "__main__":
     main()
