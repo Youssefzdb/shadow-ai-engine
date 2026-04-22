@@ -1,68 +1,56 @@
 #!/usr/bin/env python3
-"""Anomaly Detector - Statistical anomaly detection on log data"""
+"""Anomaly Detector - Statistical anomaly detection on network logs"""
 import csv
-import math
+import statistics
 from collections import defaultdict
 
 class AnomalyDetector:
-    def __init__(self, filepath):
+    def __init__(self, filepath, threshold=2.5):
         self.filepath = filepath
-        self.anomalies = []
+        self.threshold = threshold  # Z-score threshold
 
-    def _load_csv(self):
+    def _load(self):
         rows = []
         try:
-            with open(self.filepath, "r") as f:
+            with open(self.filepath, newline="") as f:
                 reader = csv.DictReader(f)
-                for row in reader:
-                    rows.append(row)
+                rows = list(reader)
         except:
             pass
         return rows
 
-    def _zscore(self, values):
-        if len(values) < 2:
-            return []
-        mean = sum(values) / len(values)
-        std = math.sqrt(sum((x - mean) ** 2 for x in values) / len(values))
-        if std == 0:
-            return [0.0] * len(values)
-        return [(x - mean) / std for x in values]
-
     def detect(self):
-        rows = self._load_csv()
+        rows = self._load()
         if not rows:
-            print("[*] No data to analyze — using demo detection")
-            return self._demo_detection()
+            return []
 
-        # Detect anomalies in numeric columns
-        numeric_cols = defaultdict(list)
+        anomalies = []
+        ip_counts = defaultdict(int)
+        byte_counts = defaultdict(list)
+
         for row in rows:
-            for k, v in row.items():
-                try:
-                    numeric_cols[k].append(float(v))
-                except:
-                    pass
+            ip = row.get("src_ip", row.get("ip", "unknown"))
+            ip_counts[ip] += 1
+            try:
+                bytes_val = int(row.get("bytes", row.get("size", 0)))
+                byte_counts[ip].append(bytes_val)
+            except:
+                pass
 
-        for col, values in numeric_cols.items():
-            zscores = self._zscore(values)
-            for i, z in enumerate(zscores):
-                if abs(z) > 2.5:
-                    self.anomalies.append({
-                        "column": col,
-                        "value": values[i],
-                        "zscore": round(z, 3),
-                        "row": i,
-                        "severity": "HIGH" if abs(z) > 3.5 else "MEDIUM"
+        # Z-score detection on request counts
+        counts = list(ip_counts.values())
+        if len(counts) > 2:
+            mean = statistics.mean(counts)
+            stdev = statistics.stdev(counts) or 1
+            for ip, count in ip_counts.items():
+                z_score = (count - mean) / stdev
+                if abs(z_score) > self.threshold:
+                    anomalies.append({
+                        "ip": ip, "count": count,
+                        "z_score": round(z_score, 2),
+                        "type": "Traffic Spike" if z_score > 0 else "Unusual Drop"
                     })
-                    print(f"[!] Anomaly in {col} row {i}: z={z:.2f}")
+                    print(f"[!] Anomaly: {ip} | z={z_score:.2f} | count={count}")
 
-        print(f"[+] Detected {len(self.anomalies)} anomalies")
-        return self.anomalies
-
-    def _demo_detection(self):
-        return [
-            {"column": "bytes_sent", "value": 9999999, "zscore": 4.2, "row": 42, "severity": "HIGH"},
-            {"column": "login_attempts", "value": 850, "zscore": 3.1, "row": 17, "severity": "HIGH"},
-            {"column": "cpu_usage", "value": 98.5, "zscore": 2.7, "row": 5, "severity": "MEDIUM"},
-        ]
+        print(f"[+] Detected {len(anomalies)} anomalies")
+        return anomalies
