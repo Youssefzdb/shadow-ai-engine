@@ -1,36 +1,42 @@
 #!/usr/bin/env python3
-"""shadow-ai-engine - AI-Powered Threat Detection & Anomaly Analysis"""
+"""
+shadow-ai-engine - AI-Powered Threat Detection & Anomaly Analysis Engine
+Uses ML models to detect network anomalies and classify threats
+"""
 import argparse
 from modules.anomaly_detector import AnomalyDetector
-from modules.traffic_classifier import TrafficClassifier
-from modules.threat_scorer import ThreatScorer
-from modules.reporter import AIReporter
+from modules.threat_classifier import ThreatClassifier
+from modules.network_profiler import NetworkProfiler
+from modules.report import AIReport
 
 def main():
-    parser = argparse.ArgumentParser(description="shadow-ai-engine - AI Threat Detection")
-    parser.add_argument("--input", required=True, help="CSV log file to analyze")
-    parser.add_argument("--mode", choices=["anomaly", "classify", "full"], default="full")
-    parser.add_argument("--output", default="ai_report.json")
+    parser = argparse.ArgumentParser(description="Shadow AI Engine")
+    parser.add_argument("--pcap", help="PCAP file to analyze")
+    parser.add_argument("--log", help="Log file to analyze")
+    parser.add_argument("--train", action="store_true", help="Train anomaly model")
+    parser.add_argument("--output", default="ai_report.html")
     args = parser.parse_args()
-
-    print(f"[*] shadow-ai-engine starting | mode: {args.mode}")
 
     results = {}
 
-    if args.mode in ["anomaly", "full"]:
-        detector = AnomalyDetector(args.input)
-        results["anomalies"] = detector.detect()
+    if args.log:
+        print(f"[*] Loading log data: {args.log}")
+        profiler = NetworkProfiler(args.log)
+        profile = profiler.build_profile()
+        results["profile"] = profile
 
-    if args.mode in ["classify", "full"]:
-        classifier = TrafficClassifier(args.input)
-        results["classifications"] = classifier.classify()
+        detector = AnomalyDetector(profile)
+        if args.train:
+            detector.train()
+        anomalies = detector.detect()
+        results["anomalies"] = anomalies
 
-    scorer = ThreatScorer(results)
-    results["threat_score"] = scorer.score()
+        classifier = ThreatClassifier()
+        results["threats"] = classifier.classify(anomalies)
 
-    reporter = AIReporter(results)
-    reporter.save(args.output)
-    print(f"[+] AI analysis complete. Report: {args.output}")
+    report = AIReport(results)
+    report.save(args.output)
+    print(f"[+] AI Analysis complete. Report: {args.output}")
 
 if __name__ == "__main__":
     main()
