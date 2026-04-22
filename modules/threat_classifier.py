@@ -1,37 +1,31 @@
 #!/usr/bin/env python3
-"""Threat Classifier - Classify anomalies into threat categories"""
+"""Threat Classifier - Rule-based threat classification"""
 
-THREAT_CATEGORIES = {
-    "bytes_sent": "Data Exfiltration",
-    "login_attempts": "Brute Force Attack",
-    "cpu_usage": "Cryptomining / Resource Abuse",
-    "connections": "Port Scanning / Lateral Movement",
-    "file_access": "Unauthorized File Access",
-}
-
-MITRE_MAPPING = {
-    "Data Exfiltration": "T1041 - Exfiltration Over C2 Channel",
-    "Brute Force Attack": "T1110 - Brute Force",
-    "Cryptomining / Resource Abuse": "T1496 - Resource Hijacking",
-    "Port Scanning / Lateral Movement": "T1046 - Network Service Scanning",
-    "Unauthorized File Access": "T1083 - File and Directory Discovery",
-}
+THREAT_RULES = [
+    {"pattern": "z_score > 5", "label": "DDoS Attack", "severity": "CRITICAL"},
+    {"pattern": "z_score > 3", "label": "Brute Force", "severity": "HIGH"},
+    {"pattern": "z_score > 2.5", "label": "Port Scan", "severity": "MEDIUM"},
+]
 
 class ThreatClassifier:
-    def __init__(self, anomalies):
-        self.anomalies = anomalies
+    def classify(self, anomalies):
+        classified = []
+        for anomaly in anomalies:
+            z = anomaly.get("z_score", 0)
+            label = "Suspicious Activity"
+            severity = "LOW"
 
-    def classify(self):
-        threats = []
-        for anomaly in self.anomalies:
-            col = anomaly.get("column", "")
-            category = THREAT_CATEGORIES.get(col, "Unknown Threat")
-            mitre = MITRE_MAPPING.get(category, "Unknown")
-            threats.append({
-                "category": category,
-                "mitre_technique": mitre,
-                "severity": anomaly.get("severity", "MEDIUM"),
-                "detail": anomaly
+            if z > 5:
+                label, severity = "DDoS Attack", "CRITICAL"
+            elif z > 3:
+                label, severity = "Brute Force", "HIGH"
+            elif z > 2.5:
+                label, severity = "Port Scan / Recon", "MEDIUM"
+
+            classified.append({
+                **anomaly,
+                "label": label,
+                "severity": severity
             })
-            print(f"[+] Classified: {category} ({mitre})")
-        return threats
+            print(f"[!] {severity}: {label} from {anomaly['ip']}")
+        return classified
