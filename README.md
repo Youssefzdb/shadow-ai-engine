@@ -1,40 +1,22 @@
-# ShadowAI-Engine
+# shadow-ai-engine 🤖
 
-> AI-Powered Threat Detection Engine
-
-![Python](https://img.shields.io/badge/Python-3.10+-blue) ![License](https://img.shields.io/badge/License-MIT-green) ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
-
-## Overview
-
-ShadowAI-Engine is a professional cybersecurity tool built for penetration testers, red teamers, and security researchers. It is designed to assist in authorized security assessments and research.
+AI-Powered Threat Detection & Anomaly Analysis Engine
 
 ## Features
-
-- 🔍 **Recon Module** — Target discovery and information gathering
-- 💉 **Exploit Engine** — Modular attack simulation framework
-- 📊 **Reporting** — Automated findings documentation
-- 🛡️ **Defense Testing** — Validate your security controls
-- 🔐 **Stealth Mode** — Evasion and obfuscation techniques
-
-## Installation
-
-```bash
-git clone https://github.com/Youssefzdb/AI
-cd ShadowAI
-pip install -r requirements.txt
-```
+- Statistical anomaly detection (Z-score on traffic logs)
+- Rule-based traffic classification (port scan, SQLi, XSS, DDoS, brute force)
+- Threat scoring system (0-100)
+- JSON report export
 
 ## Usage
-
 ```bash
-python3 main.py --target <IP> --mode full
-python3 main.py --help
+pip install -r requirements.txt
+python main.py --input network_logs.csv --mode full
+python main.py --input access.csv --mode anomaly
 ```
 
-## Disclaimer
-
-> This tool is for authorized security testing and educational purposes only. Always obtain written permission before testing any target.
-
-## Author
-
-**Shadow Core** — Cybersecurity Specialist | Penetration Tester
+## Input Format (CSV)
+```
+src_ip,dest_port,bytes,flags,payload,status,count,pkt_count
+192.168.1.1,80,1024,S,,200,5,100
+```
