@@ -1,56 +1,44 @@
 #!/usr/bin/env python3
-"""Anomaly Detector - Statistical anomaly detection on network logs"""
-import csv
+"""Anomaly Detector using statistical analysis"""
 import statistics
-from collections import defaultdict
+from collections import Counter
 
 class AnomalyDetector:
-    def __init__(self, filepath, threshold=2.5):
-        self.filepath = filepath
-        self.threshold = threshold  # Z-score threshold
+    def __init__(self, profile):
+        self.profile = profile
+        self.threshold = 2.5  # standard deviations
 
-    def _load(self):
-        rows = []
-        try:
-            with open(self.filepath, newline="") as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
-        except:
-            pass
-        return rows
+    def train(self):
+        """Build baseline from profile data"""
+        self.baseline = {
+            "mean_requests": statistics.mean(self.profile.get("request_counts", [1])),
+            "stdev_requests": statistics.stdev(self.profile.get("request_counts", [1, 1])) if len(self.profile.get("request_counts", [])) > 1 else 1,
+        }
+        print(f"[+] Baseline trained: mean={self.baseline['mean_requests']:.2f}")
 
     def detect(self):
-        rows = self._load()
-        if not rows:
-            return []
-
         anomalies = []
-        ip_counts = defaultdict(int)
-        byte_counts = defaultdict(list)
+        ip_counts = self.profile.get("ip_counts", {})
+        
+        if not ip_counts:
+            return anomalies
 
-        for row in rows:
-            ip = row.get("src_ip", row.get("ip", "unknown"))
-            ip_counts[ip] += 1
-            try:
-                bytes_val = int(row.get("bytes", row.get("size", 0)))
-                byte_counts[ip].append(bytes_val)
-            except:
-                pass
-
-        # Z-score detection on request counts
         counts = list(ip_counts.values())
-        if len(counts) > 2:
-            mean = statistics.mean(counts)
-            stdev = statistics.stdev(counts) or 1
-            for ip, count in ip_counts.items():
-                z_score = (count - mean) / stdev
-                if abs(z_score) > self.threshold:
-                    anomalies.append({
-                        "ip": ip, "count": count,
-                        "z_score": round(z_score, 2),
-                        "type": "Traffic Spike" if z_score > 0 else "Unusual Drop"
-                    })
-                    print(f"[!] Anomaly: {ip} | z={z_score:.2f} | count={count}")
+        if len(counts) < 2:
+            return anomalies
 
-        print(f"[+] Detected {len(anomalies)} anomalies")
+        mean = statistics.mean(counts)
+        stdev = statistics.stdev(counts)
+
+        for ip, count in ip_counts.items():
+            z_score = (count - mean) / stdev if stdev > 0 else 0
+            if z_score > self.threshold:
+                anomalies.append({
+                    "ip": ip,
+                    "count": count,
+                    "z_score": round(z_score, 2),
+                    "type": "Statistical Anomaly"
+                })
+                print(f"[!] Anomaly detected: {ip} z-score={z_score:.2f}")
+
         return anomalies
